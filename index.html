@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>TIMELESS ARCHIVE — AI 跨年记忆档案馆</title>
+    <style>
+        :root {
+            --bg-color: #05070A;
+            --panel-bg: rgba(14, 18, 26, 0.85);
+            --gold: #E2C792;
+            --gold-bright: #F5E6BE;
+            --gold-dim: #8C754B;
+            --pine: #7A8B7C;
+            --text-main: #EAE6DF;
+            --text-muted: #7B8491;
+            --border: rgba(226, 199, 146, 0.22);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        canvas#space-canvas {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1;
+        }
+        .container {
+            position: relative; z-index: 2; max-width: 950px; margin: 0 auto; padding: 30px 20px;
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+        }
+        header {
+            width: 100%; display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px; flex-wrap: wrap; gap: 10px;
+        }
+        h1 { font-size: 0.95rem; font-weight: 400; letter-spacing: 4px; color: var(--gold); text-shadow: 0 0 10px rgba(226,199,146,0.3); }
+        .config-bar {
+            display: flex; gap: 12px; align-items: center; width: 100%;
+            background: rgba(255,255,255,0.015); padding: 14px 20px; border-radius: 10px;
+            border: 1px solid var(--border); margin-bottom: 20px; backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        .config-bar input {
+            background: rgba(0,0,0,0.5); border: 1px solid var(--border); color: var(--gold-bright);
+            padding: 8px 14px; border-radius: 6px; font-size: 0.8rem; flex-grow: 1; outline: none; transition: all 0.3s;
+        }
+        .config-bar input:focus { border-color: var(--gold); box-shadow: 0 0 10px rgba(226,199,146,0.2); }
+        .btn-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        button, label.file-btn {
+            background: rgba(226, 199, 146, 0.08); border: 1px solid var(--border); color: var(--gold);
+            padding: 8px 18px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.3s;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        button:hover, label.file-btn:hover { 
+            background: rgba(226, 199, 146, 0.2); border-color: var(--gold); 
+            box-shadow: 0 0 15px rgba(226,199,146,0.3); transform: translateY(-1px);
+        }
+        input[type="file"] { display: none; }
+
+        /* 蒙太奇舞台 */
+        #montage-stage {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg-color);
+            z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px; transition: opacity 1.2s ease;
+        }
+        .montage-box { max-width: 720px; width: 100%; text-align: center; min-height: 180px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .montage-date { font-size: 0.85rem; color: var(--gold-dim); margin-bottom: 12px; letter-spacing: 3px; }
+        .montage-text { font-size: 1.45rem; line-height: 1.6; color: var(--text-main); font-weight: 300; text-shadow: 0 0 20px rgba(226,199,146,0.2); }
+        .montage-sender { font-size: 0.75rem; color: var(--pine); margin-top: 14px; letter-spacing: 2px; }
+        .montage-skip {
+            position: absolute; bottom: 45px; background: transparent; border: none; color: var(--text-muted);
+            font-size: 0.8rem; cursor: pointer; letter-spacing: 2px; transition: color 0.3s;
+        }
+        .montage-skip:hover { color: var(--gold); }
+
+        /* 主界面词频树与星轨 */
+        #main-view { width: 100%; display: none; flex-direction: column; align-items: center; opacity: 0; transition: opacity 1s ease; }
+        .tree-header { text-align: center; margin-bottom: 15px; }
+        .tree-header h2 { font-size: 1.5rem; font-weight: 300; letter-spacing: 5px; color: var(--gold); margin-bottom: 6px; text-shadow: 0 0 15px rgba(226,199,146,0.25); }
+        .tree-header p { font-size: 0.75rem; color: var(--text-muted); }
+
+        .tree-container {
+            position: relative; width: 100%; max-width: 720px; height: 560px;
+            display: flex; flex-direction: column; justify-content: space-around; align-items: center; padding: 15px 0;
+        }
+        .tree-container::before, .tree-container::after {
+            content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            border: 1px solid rgba(226, 199, 146, 0.15); border-radius: 50%; pointer-events: none; animation: rotate-orbit 40s linear infinite;
+        }
+        .tree-container::before { width: 520px; height: 390px; border-color: rgba(226, 199, 146, 0.25); box-shadow: inset 0 0 30px rgba(226, 199, 146, 0.06), 0 0 30px rgba(226, 199, 146, 0.06); animation-duration: 35s; }
+        .tree-container::after { width: 680px; height: 480px; border-color: rgba(122, 139, 124, 0.2); border-style: dashed; animation-duration: 55s; animation-direction: reverse; }
+        @keyframes rotate-orbit {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        .star-top {
+            width: 26px; height: 26px; background: var(--gold);
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+            box-shadow: 0 0 30px var(--gold), 0 0 60px rgba(226,199,146,0.4);
+            animation: pulse-star 3s infinite ease-in-out; cursor: pointer; z-index: 3;
+        }
+        @keyframes pulse-star {
+            0%, 100% { transform: scale(1); opacity: 0.9; filter: drop-shadow(0 0 10px var(--gold)); }
+            50% { transform: scale(1.2); opacity: 1; filter: drop-shadow(0 0 22px var(--gold)); }
+        }
+        .tree-tier { display: flex; justify-content: center; align-items: center; gap: 14px; width: 100%; z-index: 3; }
+        .word-node {
+            background: var(--panel-bg); border: 1px solid var(--border); padding: 7px 16px; border-radius: 22px;
+            font-size: 0.82rem; color: var(--text-main); cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(8px); position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .word-node:hover {
+            border-color: var(--gold); color: var(--gold-bright); transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 8px 25px rgba(226, 199, 146, 0.25), inset 0 0 10px rgba(226,199,146,0.1); background: rgba(20, 26, 38, 0.95);
+        }
+        .word-node span { font-size: 0.65rem; color: var(--gold-dim); margin-left: 6px; font-weight: 500; }
+
+        /* 弹窗 */
+        #modal {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(5, 7, 10, 0.88);
+            z-index: 100; display: none; justify-content: center; align-items: center; backdrop-filter: blur(10px); padding: 20px;
+        }
+        .modal-card {
+            background: #0D111A; border: 1px solid var(--border); width: 100%; max-width: 550px;
+            border-radius: 12px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.7), inset 0 0 20px rgba(226,199,146,0.03);
+        }
+        .modal-title { font-size: 1.05rem; color: var(--gold); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; letter-spacing: 1px; }
+        .dialog-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; max-height: 350px; overflow-y: auto; padding-right: 6px; }
+        .dialog-item {
+            background: rgba(255,255,255,0.025); padding: 10px 15px; border-radius: 8px; font-size: 0.82rem; line-height: 1.6; border-left: 2px solid var(--text-muted); transition: all 0.2s;
+        }
+        .dialog-item.highlight { border-left-color: var(--gold); background: rgba(226, 199, 146, 0.07); }
+        .dialog-meta { font-size: 0.68rem; color: var(--text-muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .modal-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 16px; }
+        .close-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; transition: color 0.2s; }
+        .close-btn:hover { color: var(--text-main); }
+        
+        #loading-mask {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(5,7,10,0.94);
+            z-index: 1000; display: none; justify-content: center; align-items: center; flex-direction: column; gap: 20px; color: var(--gold); font-size: 0.95rem; letter-spacing: 2px;
+        }
+        .spinner { width: 44px; height: 44px; border: 2px solid var
